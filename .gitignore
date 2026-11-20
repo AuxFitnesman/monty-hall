@@ -1,0 +1,10 @@
+.venv/
+.agents/
+__pycache__/
+logs/
+cloudflared.exe
+*.xlsx
+*_очередь.json
+*_чтение.xlsx
+.streamlit/secrets.toml
+.firefox-deploy/
