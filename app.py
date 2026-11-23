@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Три двери: группы ПРИ и ПИ, до трёх попыток, Excel по попыткам."""
 
+import base64
 import random
 import uuid
 from pathlib import Path
@@ -17,6 +18,19 @@ import game
 # Например: PICTURE_FILE = "dveri.jpg"
 # ============================================================
 PICTURE_FILE = "jpeg/diting_result_aa246c29e51911f1a7ce7a044809a1f1_1.jpeg"
+
+# Картинки внутри карточек дверей.
+# Положите файл в папку jpeg и впишите путь в кавычки.
+# Пока строка пустая, в карточке написано «место для картинки».
+# closed — закрытая дверь, mine — выбранная вами,
+# goat — коза, empty — пустая в итоге, prize — приз.
+DOOR_PICTURES = {
+    "closed": "",
+    "mine": "",
+    "goat": "",
+    "empty": "",
+    "prize": "",
+}
 
 KNEW_OPTIONS = (
     "да, знаю, в чём там дело",
@@ -145,6 +159,36 @@ def pick_second(decision):
     )
 
 
+def door_picture_html(kind, ink):
+    name = DOOR_PICTURES.get(kind, "")
+    path = Path(__file__).resolve().parent / name if name else None
+    box = (
+        "height:96px;margin:10px 6px 2px;border-radius:8px;"
+        "display:flex;align-items:center;justify-content:center;overflow:hidden;"
+    )
+    if path is not None and path.is_file():
+        suffix = path.suffix.lower()
+        mime = {
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".webp": "image/webp",
+            ".gif": "image/gif",
+        }.get(suffix, "image/jpeg")
+        encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+        return (
+            f"<div style='{box}'>"
+            f"<img src='data:{mime};base64,{encoded}' alt='' "
+            f"style='max-width:100%;max-height:96px;object-fit:contain;'>"
+            f"</div>"
+        )
+    return (
+        f"<div style='{box}border:1.5px dashed {ink};font-size:13px;'>"
+        "место для картинки"
+        "</div>"
+    )
+
+
 def door_card(number, kind, note):
     colors = {
         "closed": ("#f3f0e8", "#3f3c36", "закрыта"),
@@ -155,11 +199,13 @@ def door_card(number, kind, note):
     }
     background, ink, title = colors[kind]
     note_html = f"<div style='margin-top:6px;font-size:14px;'>{note}</div>" if note else ""
+    picture_html = door_picture_html(kind, ink)
     st.markdown(
         f"""
         <div style="border:1px solid #d9d3c7;border-radius:10px;padding:16px 8px 14px;
-                    text-align:center;background:{background};color:{ink};min-height:118px;">
+                    text-align:center;background:{background};color:{ink};min-height:214px;">
             <div style="font-size:13px;letter-spacing:.06em;">ДВЕРЬ {number}</div>
+            {picture_html}
             <div style="font-size:22px;margin-top:8px;">{title}</div>
             {note_html}
         </div>
