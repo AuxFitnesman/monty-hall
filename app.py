@@ -231,11 +231,10 @@ def show_doors_second():
 def show_doors_result():
     prize = st.session_state.prize
     final = st.session_state.final
-    other_kind = "empty" if st.session_state.won else "goat"
     columns = st.columns(3)
     for column, number in zip(columns, game.DOORS):
         with column:
-            kind = "prize" if number == prize else other_kind
+            kind = "prize" if number == prize else "goat"
             note = "вы остановились здесь" if number == final else ""
             door_card(number, kind, note)
 
