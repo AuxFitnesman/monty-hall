@@ -35,7 +35,6 @@ def init_state():
     defaults = {
         "step": "home",
         "group": None,
-        "fio": "",
         "knew": None,
         "attempt": 1,
         "sid": None,
@@ -83,7 +82,6 @@ def begin_attempt(attempt):
             attempt,
             sid,
             время=game.now_text(),
-            фио=st.session_state.fio,
             знал_парадокс=st.session_state.knew,
             дверь_с_призом=prize,
         )
@@ -147,22 +145,12 @@ def pick_second(decision):
     )
 
 
-def full_name(text):
-    parts = [part for part in text.replace("ё", "е").split() if part]
-    if len(parts) < 3:
-        return False
-    for part in parts[:3]:
-        letters = [ch for ch in part if ch.isalpha()]
-        if len(letters) < 2:
-            return False
-    return True
-
-
 def door_card(number, kind, note):
     colors = {
         "closed": ("#f3f0e8", "#3f3c36", "закрыта"),
         "mine": ("#e4edf8", "#243e66", "ваш выбор"),
         "empty": ("#e5f0e6", "#245233", "пусто"),
+        "goat": ("#e5f0e6", "#245233", "коза"),
         "prize": ("#f8efd2", "#6d5414", "приз"),
     }
     background, ink, title = colors[kind]
@@ -187,7 +175,7 @@ def show_doors_second():
     for column, number in zip(columns, game.DOORS):
         with column:
             if number == host:
-                door_card(number, "empty", "её открыл ведущий")
+                door_card(number, "goat", "её открыл ведущий")
             elif number == first:
                 door_card(number, "mine", "пока закрыта")
             else:
@@ -259,8 +247,14 @@ def screen_home():
 def screen_faculty():
     st.markdown(
         """
+        <p style="text-align:center;font-size:1.35rem;line-height:1.45;margin:0.4rem 0 0.2rem;">
+            Привет! Пожалуйста, укажи, какое направление ты представляешь :)
+        </p>
+        <p style="text-align:center;font-size:1.05rem;line-height:1.45;color:#5c5348;margin:0 0 0.6rem;">
+            (ПРИ — прикладная информатика; ПИ — программная инженерия)
+        </p>
         <h1 style="text-align:center;font-size:4.2rem;letter-spacing:.12em;
-                   margin:2.2rem 0 2rem;font-weight:700;">КТиИБ</h1>
+                   margin:0.4rem 0 1.2rem;font-weight:700;">КТиИБ</h1>
         """,
         unsafe_allow_html=True,
     )
@@ -278,27 +272,31 @@ def screen_faculty():
 
 
 def screen_name():
-    st.subheader("Фамилия, имя и отчество")
-    fio = st.text_input("ФИО", label_visibility="collapsed", placeholder="Иванов Иван Иванович", key="fio_input")
+    st.markdown(
+        """
+        <p style="font-size:1.35rem;line-height:1.55;margin:1.2rem 0 2rem;">
+            Привет! Мы начинаем игру, чтобы дальше всё прошло успешно
+            и стало понятно, какое направление справилось лучше.
+            Это соревнование между группами, и оно ни на что не влияет.
+        </p>
+        """,
+        unsafe_allow_html=True,
+    )
     left, right = st.columns(2)
     with left:
         if st.button("Назад"):
             st.session_state.step = "faculty"
             st.rerun()
     with right:
-        if st.button("Дальше", type="primary"):
-            if not full_name(fio):
-                st.warning("Напишите фамилию, имя и отчество полностью.")
-            else:
-                st.session_state.fio = " ".join(fio.split())
-                st.session_state.step = "know"
-                st.rerun()
+        if st.button("Далее", type="primary"):
+            st.session_state.step = "know"
+            st.rerun()
 
 
 def screen_know():
-    st.caption(f"{st.session_state.group} · {st.session_state.fio}")
+    st.caption(st.session_state.group)
     knew = st.radio(
-        "Были ли вы знакомы с парадоксом Монти Холла до этой игры?",
+        "Слышал ли ты когда-то о таком парадоксе?",
         KNEW_OPTIONS,
         index=None,
         key="knew_radio",
@@ -313,8 +311,10 @@ def screen_know():
 
 def screen_choose():
     st.caption(f"{st.session_state.group} · попытка {st.session_state.attempt}")
-    st.subheader("Выберите дверь")
-    st.write("Все три пока закрыты. После выбора дверь не откроется, откроет ведущий другую.")
+    st.write(
+        "За одной из трёх дверей — приз, за двумя другими — козы. "
+        "Какую дверь ты выберешь?"
+    )
     columns = st.columns(3)
     attempt = st.session_state.attempt
     for column, number in zip(columns, game.DOORS):
@@ -329,7 +329,7 @@ def screen_switch():
     attempt = st.session_state.attempt
     st.subheader("Ведущий открыл дверь")
     st.write(
-        f"Ведущий открыл дверь {host}. Там пусто, приз он не показывает. "
+        f"Ведущий открыл дверь {host}. Там оказалась коза. "
         "Остались две закрытые двери."
     )
     show_doors_second()
@@ -345,9 +345,9 @@ def screen_switch():
 
 def screen_retry():
     if st.session_state.attempt == 1:
-        st.subheader("Пусто")
+        st.subheader("Коза-дереза!")
         st.write(
-            "За вашей дверью приза нет: сегодня он лег в другом месте. "
+            "За твоей дверью коза: приз оказался в другом месте. "
             "Двери можно разложить заново и испытать удачу ещё раз."
         )
         yes_label = "Да, ещё раз"
@@ -417,8 +417,8 @@ def page_style(step):
         div[data-testid='stColumn'] [data-testid='stButton'] {width: 100%;}
         div[data-testid='stButton'] > button {
             width: 100%;
-            height: 62vh;
-            min-height: 420px;
+            height: 48vh;
+            min-height: 240px;
             font-size: 4rem;
             font-weight: 700;
             letter-spacing: .08em;
