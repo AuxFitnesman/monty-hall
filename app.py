@@ -25,8 +25,8 @@ PICTURE_FILE = "jpeg/diting_result_aa246c29e51911f1a7ce7a044809a1f1_1.jpeg"
 # closed — закрытая дверь, mine — выбранная вами,
 # goat — коза, empty — пустая в итоге, prize — приз.
 DOOR_PICTURES = {
-    "closed": "",
-    "mine": "",
+    "closed": "jpeg/dver.png",
+    "mine": "jpeg/dver.png",
     "goat": "jpeg/koza.png",
     "empty": "",
     "prize": "jpeg/priz.png",
