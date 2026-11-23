@@ -28,7 +28,7 @@ DOOR_PICTURES = {
     "closed": "jpeg/dver.png",
     "mine": "jpeg/dver.png",
     "goat": "jpeg/koza.png",
-    "empty": "",
+    "empty": "jpeg/dver.png",
     "prize": "jpeg/priz.png",
 }
 
