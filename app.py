@@ -29,7 +29,7 @@ DOOR_PICTURES = {
     "mine": "",
     "goat": "jpeg/koza.png",
     "empty": "",
-    "prize": "",
+    "prize": "jpeg/priz.png",
 }
 
 KNEW_OPTIONS = (
