@@ -247,14 +247,14 @@ def screen_home():
 def screen_faculty():
     st.markdown(
         """
+        <h1 style="text-align:center;font-size:2.1rem;line-height:1.25;
+                   margin:0.2rem 0 0.8rem;font-weight:700;">Факультет — КТиИБ</h1>
         <p style="text-align:center;font-size:1.35rem;line-height:1.45;margin:0.4rem 0 0.2rem;">
             Привет! Пожалуйста, укажи, какое направление ты представляешь :)
         </p>
         <p style="text-align:center;font-size:1.05rem;line-height:1.45;color:#5c5348;margin:0 0 0.6rem;">
             (ПРИ — прикладная информатика; ПИ — программная инженерия)
         </p>
-        <h1 style="text-align:center;font-size:4.2rem;letter-spacing:.12em;
-                   margin:0.4rem 0 1.2rem;font-weight:700;">КТиИБ</h1>
         """,
         unsafe_allow_html=True,
     )
