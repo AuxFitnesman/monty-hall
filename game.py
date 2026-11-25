@@ -396,7 +396,8 @@ def _write_outcome_line(sheet):
             opinions.append(opinion)
     for index in reversed(summary_rows):
         sheet.delete_rows(index)
-    sheet.append_row([outcome_sentence(opinions)], value_input_option="USER_ENTERED")
+    if opinions:
+        sheet.append_row([outcome_sentence(opinions)], value_input_option="USER_ENTERED")
 
 
 def ensure_workbooks():
