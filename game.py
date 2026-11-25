@@ -28,6 +28,7 @@ COLUMNS = [
     "выиграл_бы_иначе",
     "что_выгоднее",
 ]
+SUMMARY_COLUMNS = ["попытка", *COLUMNS]
 
 _lock = threading.Lock()
 
@@ -204,6 +205,10 @@ def _sheet_title(group, attempt):
     return f"{group} попытка {int(attempt)}"
 
 
+def _summary_title(group):
+    return f"{group} все результаты"
+
+
 def _open_spreadsheet():
     global _spreadsheet
     if _spreadsheet is not None:
@@ -228,19 +233,67 @@ def _open_spreadsheet():
     return _spreadsheet
 
 
-def _worksheet(group, attempt):
+def _sheet_by_title(title, columns):
     import gspread
 
     book = _open_spreadsheet()
-    title = _sheet_title(group, attempt)
     try:
         sheet = book.worksheet(title)
     except gspread.WorksheetNotFound:
-        sheet = book.add_worksheet(title, rows=2000, cols=len(COLUMNS))
+        sheet = book.add_worksheet(title, rows=2000, cols=len(columns))
     header = sheet.row_values(1)
-    if header != list(COLUMNS):
-        sheet.update([list(COLUMNS)], "A1", value_input_option="RAW")
+    if header != list(columns):
+        sheet.update([list(columns)], "A1", value_input_option="RAW")
     return sheet
+
+
+def _worksheet(group, attempt):
+    return _sheet_by_title(_sheet_title(group, attempt), COLUMNS)
+
+
+def _put_row(sheet, columns, key_name, record):
+    values = sheet.get_all_values()
+    if not values:
+        values = [list(columns)]
+    key_index = columns.index(key_name)
+    row_number = None
+    current = {column: "" for column in columns}
+    for index, row in enumerate(values[1:], start=2):
+        if len(row) > key_index and row[key_index] == record[key_name]:
+            row_number = index
+            for column, value in zip(columns, row):
+                current[column] = "" if value is None else str(value)
+            break
+    current.update({key: value for key, value in record.items() if value is not None})
+    payload = [current.get(column, "") for column in columns]
+    if row_number is None:
+        sheet.append_row(payload, value_input_option="USER_ENTERED")
+    else:
+        sheet.update([payload], f"A{row_number}", value_input_option="USER_ENTERED")
+    return current
+
+
+def _refresh_summary(group):
+    summary = _sheet_by_title(_summary_title(group), SUMMARY_COLUMNS)
+    existing = summary.get_all_values()
+    id_index = SUMMARY_COLUMNS.index("id")
+    known = set()
+    for row in existing[1:]:
+        if len(row) > id_index and row[id_index]:
+            known.add(row[id_index])
+    missing = []
+    for attempt in ATTEMPTS:
+        values = _worksheet(group, attempt).get_all_values()
+        for row in values[1:]:
+            if not row or not row[0] or row[0] in known:
+                continue
+            record = {"попытка": str(attempt)}
+            for column, value in zip(COLUMNS, row):
+                record[column] = "" if value is None else str(value)
+            missing.append([record.get(column, "") for column in SUMMARY_COLUMNS])
+            known.add(record["id"])
+    if missing:
+        summary.append_rows(missing, value_input_option="USER_ENTERED")
 
 
 def _ensure_sheets():
@@ -254,6 +307,7 @@ def _ensure_sheets():
             for group in GROUPS:
                 for attempt in ATTEMPTS:
                     _worksheet(group, attempt)
+                _refresh_summary(group)
         except Exception as exc:
             raise OSError("Google Таблица недоступна. Проверьте, что к ней есть доступ у сервисного аккаунта.") from exc
         _sheets_ready = True
@@ -262,26 +316,11 @@ def _ensure_sheets():
 def _save_sheets(group, attempt, incoming):
     try:
         sheet = _worksheet(group, attempt)
-        values = sheet.get_all_values()
-    except Exception as exc:
-        raise OSError("Google Таблица недоступна. Проверьте, что к ней есть доступ у сервисного аккаунта.") from exc
-    if not values:
-        values = [list(COLUMNS)]
-    row_number = None
-    current = {column: "" for column in COLUMNS}
-    for index, row in enumerate(values[1:], start=2):
-        if row and row[0] == incoming["id"]:
-            row_number = index
-            for column, value in zip(COLUMNS, row):
-                current[column] = "" if value is None else str(value)
-            break
-    current.update(incoming)
-    payload = [current.get(column, "") for column in COLUMNS]
-    try:
-        if row_number is None:
-            sheet.append_row(payload, value_input_option="USER_ENTERED")
-        else:
-            sheet.update([payload], f"A{row_number}", value_input_option="USER_ENTERED")
+        saved = _put_row(sheet, COLUMNS, "id", incoming)
+        saved["попытка"] = str(int(attempt))
+        _put_row(_sheet_by_title(_summary_title(group), SUMMARY_COLUMNS), SUMMARY_COLUMNS, "id", saved)
+    except OSError:
+        raise
     except Exception as exc:
         raise OSError("Строка в Google Таблицу не записалась. Нажмите кнопку ещё раз.") from exc
 
@@ -289,7 +328,8 @@ def _save_sheets(group, attempt, incoming):
 def ensure_workbooks():
     """Папка ПРИ и папка ПИ, в каждой три файла: попытка 1, 2 и 3.
 
-    В облаке вместо файлов готовятся шесть листов Google Таблицы.
+    В облаке вместо файлов готовятся листы Google Таблицы:
+    по попыткам и ещё один лист на группу со всеми результатами.
     Если Excel уже закрыт, сюда же дописываются ответы, которые копились, пока файл был открыт.
     """
     if _use_sheets():
