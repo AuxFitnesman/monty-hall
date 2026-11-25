@@ -29,6 +29,11 @@ COLUMNS = [
     "что_выгоднее",
 ]
 SUMMARY_COLUMNS = ["попытка", *COLUMNS]
+OPINIONS = (
+    "держаться первого выбора",
+    "менять",
+    "затрудняюсь сказать",
+)
 
 _lock = threading.Lock()
 
@@ -209,6 +214,51 @@ def _summary_title(group):
     return f"{group} все результаты"
 
 
+def _people_passed_phrase(count):
+    number = abs(int(count))
+    tail = number % 100
+    last = tail % 10
+    if last == 1 and not 11 <= tail <= 14:
+        verb, noun = "прошёл", "человек"
+    elif 2 <= last <= 4 and not 11 <= tail <= 14:
+        verb, noun = "прошло", "человека"
+    else:
+        verb, noun = "прошло", "человек"
+    return f"Всего {verb} {number} {noun}."
+
+
+def _share_percents(counts):
+    total = sum(counts)
+    if total <= 0:
+        return [0, 0, 0]
+    raw = [count * 100 / total for count in counts]
+    whole = [int(value) for value in raw]
+    left = 100 - sum(whole)
+    order = sorted(
+        range(len(counts)),
+        key=lambda index: (raw[index] - whole[index], counts[index]),
+        reverse=True,
+    )
+    for index in order[:left]:
+        whole[index] += 1
+    return whole
+
+
+def outcome_sentence(opinions):
+    """Итог по ответам «что выгоднее»: сколько человек дошли до конца и как ответили."""
+    counts = [sum(1 for item in opinions if item == choice) for choice in OPINIONS]
+    total = sum(counts)
+    if total == 0:
+        return "Всего прошло 0 человек. Итогового ответа пока нет."
+    stay, switch, unsure = _share_percents(counts)
+    return (
+        f"{_people_passed_phrase(total)} Из них "
+        f"{stay}% выбирают «{OPINIONS[0]}», "
+        f"{switch}% — «{OPINIONS[1]}», "
+        f"{unsure}% — «{OPINIONS[2]}»."
+    )
+
+
 def _open_spreadsheet():
     global _spreadsheet
     if _spreadsheet is not None:
@@ -294,6 +344,7 @@ def _refresh_summary(group):
             known.add(record["id"])
     if missing:
         summary.append_rows(missing, value_input_option="USER_ENTERED")
+    _write_outcome_line(summary)
 
 
 def _ensure_sheets():
@@ -318,11 +369,34 @@ def _save_sheets(group, attempt, incoming):
         sheet = _worksheet(group, attempt)
         saved = _put_row(sheet, COLUMNS, "id", incoming)
         saved["попытка"] = str(int(attempt))
-        _put_row(_sheet_by_title(_summary_title(group), SUMMARY_COLUMNS), SUMMARY_COLUMNS, "id", saved)
+        summary = _sheet_by_title(_summary_title(group), SUMMARY_COLUMNS)
+        _put_row(summary, SUMMARY_COLUMNS, "id", saved)
+        _write_outcome_line(summary)
     except OSError:
         raise
     except Exception as exc:
         raise OSError("Строка в Google Таблицу не записалась. Нажмите кнопку ещё раз.") from exc
+
+
+def _write_outcome_line(sheet):
+    values = sheet.get_all_values()
+    opinion_index = SUMMARY_COLUMNS.index("что_выгоднее")
+    id_index = SUMMARY_COLUMNS.index("id")
+    summary_rows = []
+    opinions = []
+    for index, row in enumerate(values[1:], start=2):
+        first = row[0].strip() if row else ""
+        if first.startswith("Всего прош"):
+            summary_rows.append(index)
+            continue
+        if len(row) <= id_index or not row[id_index].strip():
+            continue
+        opinion = row[opinion_index].strip() if len(row) > opinion_index else ""
+        if opinion in OPINIONS:
+            opinions.append(opinion)
+    for index in reversed(summary_rows):
+        sheet.delete_rows(index)
+    sheet.append_row([outcome_sentence(opinions)], value_input_option="USER_ENTERED")
 
 
 def ensure_workbooks():
